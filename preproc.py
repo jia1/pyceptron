@@ -17,6 +17,16 @@ def strip_and_filter_line(ln):
     tokens = map(lambda t: t.strip().strip(punctuation).lower(), ln.split(' '))
     return list(filter(lambda t: t and len(t) > 2 and t.isalpha() and t not in stop_list, tokens))
 
+def chi_square(w, c):
+  n00 = 0
+  n01 = 0
+  n10 = 0
+  n11 = 0
+  return ((n11+n10+n01+n00)*(n11*n00-n10*n01)**2)/((n11+n01)*(n11+n10)*(n10+n00)*(n01+n00))
+
+def feature_select(d):
+  pass
+
 p = PorterStemmer()
 k = 2
 
@@ -38,6 +48,13 @@ for curr_dir, sub_dir, files in os.walk(src_dir):
             if not fin_freq_dict:
               fin_freq_dict = freq_dict
             # Normalize the frequencies based on fin_freq_dict
+            sum_freq = sum(fin_freq_dict.values())
+            normalized_freq_dict = { word: freq / sum_freq for word, freq in fin_freq_dict.items() }
+            # TODO:
+            # Figure out the sequence of steps
+            # Normalize then feature select, or
+            # Feature select then normalize amongst the selected ones?
+            feature_select(normalized_freq_dict)
 
 # translator = str.maketrans('', '', string.punctuation)
 # some_string.translate(translator)
