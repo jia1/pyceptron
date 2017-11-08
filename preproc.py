@@ -20,8 +20,6 @@ def strip_and_filter_line(ln):
 p = PorterStemmer()
 k = 2
 
-num_empty_dict = 0
-
 for curr_dir, sub_dir, files in os.walk(src_dir):
     curr_class = curr_dir.split('/')[-1]
     for file in files:
@@ -38,10 +36,8 @@ for curr_dir, sub_dir, files in os.walk(src_dir):
                 freq_dict[word] += 1
             fin_freq_dict = { word: freq for word, freq in freq_dict.items() if freq >= k }
             if not fin_freq_dict:
-              num_empty_dict += 1
-              print(file, end = ' ')
-
-print(num_empty_dict)
+              fin_freq_dict = freq_dict
+            # Normalize the frequencies based on fin_freq_dict
 
 # translator = str.maketrans('', '', string.punctuation)
 # some_string.translate(translator)
