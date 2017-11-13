@@ -122,6 +122,16 @@ def put_chi(c, w, chi_value):
     else:
         class_to_word_to_chi[c][w] = max(class_to_word_to_chi[c][w], chi_value)
 
+def gen_feat_by_chi():
+    global class_to_feat_chi_tup
+    max_feat_vec_len = sys.maxsize
+    class_to_feat_sorted = { c: [] for c in class_list }
+    for c in class_to_word_to_chi:
+        class_to_feat_sorted[c] = sorted(class_to_word_to_chi[c].items(), key = lambda x: x[1], reverse = True)
+        max_feat_vec_len = min(max_feat_vec_len, len(class_to_feat_sorted[c]))
+    max_feat_vec_len *= feat_prune_ratio 
+    class_to_feat_chi_tup = { c: class_to_feat_sorted[c][:int(max_feat_vec_len)] for c in class_to_feat_sorted }
+
 def gen_feat_by_tfidf():
     global class_to_vocab_to_tfidf
     
@@ -192,16 +202,16 @@ with open(train_class_list_file, 'r') as t:
             if curr_class not in class_list:
                 class_list.append(curr_class)
                 num_class += 1
-                class_to_text[c] = set()
-                class_to_word_to_chi[c] = {}
-                class_to_feat_chi_tup[c] = set()
-                class_to_vocab_to_tfidf[c] = {}
-                # class_to_word_to_num_text[c] = {}
-                class_to_feat_tfidf_tup[c] = set()
-                class_to_feat_set[c] = set()
-                class_to_feat_list_sort_by_lex[c] = []
-                class_to_feat_to_index[c] = {}
-                class_to_weights[c] = []
+                class_to_text[curr_class] = set()
+                class_to_word_to_chi[curr_class] = {}
+                class_to_feat_chi_tup[curr_class] = set()
+                class_to_vocab_to_tfidf[curr_class] = {}
+                # class_to_word_to_num_text[curr_class] = {}
+                class_to_feat_tfidf_tup[curr_class] = set()
+                class_to_feat_set[curr_class] = set()
+                class_to_feat_list_sort_by_lex[curr_class] = []
+                class_to_feat_to_index[curr_class] = {}
+                class_to_weights[curr_class] = []
 
             class_to_text[curr_class].add(text)
             text_to_word_list[text] = flat_text
