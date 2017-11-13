@@ -217,12 +217,15 @@ with open(train_class_list_file, 'r') as t:
             text_to_word_list[text] = flat_text
             text_to_count[text] = { word: count / sum_count for word, count in fin_word_to_count.items() }
 
+            print(text, end = ' ')
+
 class_to_word_to_chi = { c: {} for c in class_list }
 class_to_feat_chi_tup = { c: set() for c in class_list }
 class_to_word_to_num_text = { c: {} for c in class_list }
 class_to_feat_tfidf_tup = { c: set() for c in class_list }
 
 feat_select()
+print(class_to_feat_chi_tup)
 
 class_to_feat_set = { c: set() for c in class_list }
 
@@ -246,6 +249,8 @@ class_to_feat_to_index = { c: {} for c in class_list }
 for c in class_to_feat_list_sort_by_lex:
     for i in range(len(class_to_feat_list_sort_by_lex[c])):
         class_to_feat_to_index[c][class_to_feat_list_sort_by_lex[c][i]] = i
+
+print(class_to_feat_to_index)
 
 # https://machinelearningmastery.com/implement-perceptron-algorithm-scratch-python/
 # Split data_mat into num_folds number of folds
@@ -339,6 +344,9 @@ for c in class_list:
             class_to_feat_mat[c].append(feat_vec)
 
 data = class_to_feat_mat
+
+print(data)
+
 for num_folds in num_folds_list:
     for alpha in alpha_list:
         for max_iterations in max_iterations_list:
@@ -352,7 +360,7 @@ for num_folds in num_folds_list:
                 print()
 
 for c in class_list:
-    class_to_weights[c] = train_weights(data, alpha_list[0], max_iterations_list[0])
+    class_to_weights[c] = train_weights(data[c], alpha_list[0], max_iterations_list[0])
 
 with open(model_file, 'w') as m:
     lines_to_write = []
