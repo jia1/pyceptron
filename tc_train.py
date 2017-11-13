@@ -10,6 +10,8 @@ args = sys.argv
 if len(args) != 4:
     sys.exit('Usage: python3 tc_train.py stopword-list train-class-list model')
 
+print('Command line arguments accepted.')
+
 stopword_list_file, train_class_list_file, model_file = args[1:]
 
 k = 3
@@ -52,6 +54,8 @@ class_to_weights = {}
 
 p = PorterStemmer()
 seed(4248)
+
+print('Data structures loaded.')
 
 def strip_and_filter_line(ln):
     if all(x in ln for x in [':', '@']):
@@ -179,8 +183,12 @@ def feat_select():
                 put_chi(c, w, calc_chi_square(w, c))
     gen_feat_by_chi()
 
+print('Helper functions defined.')
+
 with open(stopword_list_file, 'r') as s:
     stop_list = list(map(lambda ln: ln.strip(), s.readlines()))
+
+print('Stop words loaded into memory.')
 
 with open(train_class_list_file, 'r') as t:
     lines = map(lambda ln: ln.strip().split(' '), t.readlines())
@@ -217,15 +225,18 @@ with open(train_class_list_file, 'r') as t:
             text_to_word_list[text] = flat_text
             text_to_count[text] = { word: count / sum_count for word, count in fin_word_to_count.items() }
 
-            print(text, end = ' ')
+print('Frequency of unigrams and bigrams counted.')
 
 class_to_word_to_chi = { c: {} for c in class_list }
 class_to_feat_chi_tup = { c: set() for c in class_list }
 class_to_word_to_num_text = { c: {} for c in class_list }
 class_to_feat_tfidf_tup = { c: set() for c in class_list }
 
+print('Feature selection beginning...')
+
 feat_select()
-print(class_to_feat_chi_tup)
+
+print('Feature selection completed.')
 
 class_to_feat_set = { c: set() for c in class_list }
 
@@ -243,6 +254,8 @@ for c in class_to_feat_chi_tup:
                 if num_added >= num_feat_per_neg_class:
                     break
 
+print('Features from negative classes added to each positive class.')
+
 class_to_feat_list_sort_by_lex = { c: sorted(list(class_to_feat_set[c])) for c in class_list }
 class_to_feat_to_index = { c: {} for c in class_list }
 
@@ -250,7 +263,7 @@ for c in class_to_feat_list_sort_by_lex:
     for i in range(len(class_to_feat_list_sort_by_lex[c])):
         class_to_feat_to_index[c][class_to_feat_list_sort_by_lex[c][i]] = i
 
-print(class_to_feat_to_index)
+print('Features mapped to vector indices.')
 
 # https://machinelearningmastery.com/implement-perceptron-algorithm-scratch-python/
 # Split data_mat into num_folds number of folds
@@ -316,11 +329,12 @@ def train_weights(train, alpha, max_iterations = 1000):
 def perceptron(train, test, alpha, max_iterations):
     predictions = list()
     weights = train_weights(train, alpha, max_iterations)
-    print(weights)
     for row in test:
         prediction = predict(row, weights)
         predictions.append(prediction)
     return predictions
+
+print('Perceptron helper functions defined.')
 
 # load and prepare data
 class_to_feat_mat = { c: [] for c in class_list }
@@ -343,9 +357,11 @@ for c in class_list:
             feat_vec[-1] = 1 if c == d else 0
             class_to_feat_mat[c].append(feat_vec)
 
+print('Training data converted to vectors.')
+
 data = class_to_feat_mat
 
-print(data)
+print('Cross validation beginning...')
 
 for num_folds in num_folds_list:
     for alpha in alpha_list:
@@ -359,8 +375,13 @@ for num_folds in num_folds_list:
                 print('Mean accuracy: {:.2f}%'.format(sum(scores) / num_folds))
                 print()
 
+print('Cross validation completed.')
+print('Full training beginning...')
+
 for c in class_list:
     class_to_weights[c] = train_weights(data[c], alpha_list[0], max_iterations_list[0])
+
+print('Weights being written to model file...')
 
 with open(model_file, 'w') as m:
     lines_to_write = []
@@ -368,6 +389,8 @@ with open(model_file, 'w') as m:
     lines_to_write.append(str(class_to_feat_to_index))
     lines_to_write.append(str(class_to_weights))
     m.write('\n'.join(lines_to_write))
+
+print('Done.')
 
 # Write model to file
 # 1. Class list
