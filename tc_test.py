@@ -28,7 +28,7 @@ def get_word_to_count(word_list):
     word_to_count = {}
     num_words = len(word_list)
     prev_unigram = word_list[0]
-    for i in range(1, num_words)
+    for i in range(1, num_words):
         curr_unigram = word_list[i]
         ngrams = [curr_unigram, '{} {}'.format(prev_unigram, curr_unigram)]
         for ngram in ngrams:
@@ -53,10 +53,12 @@ def get_weaker_word_to_count(word_to_count):
                 break
     return fin_word_to_count
 
+with open(stopword_list_file, 'r') as s:
+    stop_list = list(map(lambda ln: ln.strip(), s.readlines()))
+
 with open(model_file, 'r') as m:
     lines = list(map(lambda w: ast.literal_eval(w), m.readlines()))
     class_list, class_to_feat_to_index, class_to_weights = lines
-
 
 with open(test_class_list_file, 'r') as a:
     lines = map(lambda ln: ln.strip().split(' '), a.readlines())
@@ -94,6 +96,9 @@ with open(test_list_file, 'r') as t:
             total += 1
             if text_to_class[text] == instance_class_to_output[0][0]:
                 score += 1
+
+print(score)
+print(total)
 
 with open('answer', 'w') as f:
     f.writelines(lines_to_write)
