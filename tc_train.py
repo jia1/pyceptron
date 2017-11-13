@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import sys
@@ -5,38 +6,51 @@ from string import punctuation
 from porter import PorterStemmer
 from random import seed, randrange
 
-k = 3
-max_compromise = 0
-num_both, num_train = 0, 0
-train_ratio = 1
-# train_ratio = 0.8
-# test_ratio = 1 - train_ratio
-feat_prune_ratio = 0.5
-
-num_folds_list = [5] # [5, 10]
-alpha_list = [0.05] # [0.02, 0.03, 0.05, 0.07, 0.1]
-max_iterations_list = [500] # [500, 1000, 2000]
-
 args = sys.argv
 if len(args) != 4:
     sys.exit('Usage: python3 tc_train.py stopword-list train-class-list model')
 
 stopword_list_file, train_class_list_file, model_file = args[1:]
-p = PorterStemmer()
 
+k = 3
+max_compromise = 1
+num_both, num_train = 0, 0
+train_ratio = 1
+# train_ratio = 0.8
+# test_ratio = 1 - train_ratio
+
+num_folds_list = [10] # [5, 10]
+alpha_list = [0.05] # [0.02, 0.03, 0.05, 0.07, 0.1]
+max_iterations_list = [1000] # [500, 1000, 2000]
+
+num_class = 0
 class_list = []
-class_to_text, text_to_freq = {}, {}
+class_to_text = {}
 
-nxxs = ['n10', 'n11']
-nxxs_map = { 'n00': 'n10', 'n01': 'n11' }
-nxx_dict = { n: {} for n in nxxs }
-chi_dict = {}
+feat_prune_ratio = 0.5
 
+text_to_count = {}
+nxx_list = ['n10', 'n11']
+nxx_map = {
+    'n00': 'n10',
+    'n01': 'n11'
+}
+nxx_to_word_to_class_to_chi = { n: {} for n in nxx_list }
+class_to_word_to_chi = {}
 class_to_feat_chi_tup = {}
+
+text_to_word_list = {}
+class_to_vocab_to_tfidf = {}
+class_to_feat_tfidf_tup = {}
+
 class_to_feat_set = {}
 class_to_feat_list_sort_by_lex = {}
+class_to_feat_to_index = {}
 class_to_feat_mat = {}
 
+class_to_weights = {}
+
+p = PorterStemmer()
 seed(4248)
 
 def strip_and_filter_line(ln):
@@ -45,59 +59,115 @@ def strip_and_filter_line(ln):
     tokens = map(lambda t: t.strip().strip(punctuation).lower(), ln.split(' '))
     return list(filter(lambda t: t and len(t) > 2 and t.isalpha() and t not in stop_list, tokens))
 
+def get_word_to_count(word_list):
+    word_to_count = {}
+    num_words = len(word_list)
+    prev_unigram = word_list[0]
+    for i in range(1, num_words):
+        curr_unigram = word_list[i]
+        ngrams = [curr_unigram, '{} {}'.format(prev_unigram, curr_unigram)]
+        for ngram in ngrams:
+            if ngram not in word_to_count:
+                word_to_count[ngram] = 1
+            else:
+                word_to_count[ngram] += 1
+        prev_unigram = curr_unigram
+    return word_to_count
+
+def get_weaker_word_to_count(word_to_count):
+    fin_word_to_count = {}
+    for compromise in range(1, max_compromise - 1):
+        if fin_word_to_count:
+            break
+        fin_word_to_count = { word: count for word, count in word_to_count.items() \
+                             if count >= k - compromise }
+        for len_gram in range(2, 0, -1):
+            fin_word_to_count = { word: count for word, count in fin_word_to_count.items() \
+                                 if len(word.split(' ')) >= len_gram }
+            if fin_word_to_count:
+                break
+    return fin_word_to_count
+
 def is_in(a, b):
     return 1 if a in b else 0
 
 def count_nxx(nxx, w, c):
-    global class_list, class_to_text, text_to_freq
-    answer = 0
+    nxx_value = 0
     if nxx == 'n10':
         for class_name in filter(lambda x: x != c, class_list):
             for text in class_to_text[class_name]:
-                answer += is_in(w, text_to_freq[text])
+                nxx_value += is_in(w, text_to_count[text])
     elif nxx == 'n11':
         for text in class_to_text[c]:
-            answer += is_in(w, text_to_freq[text])
-    return answer
+            nxx_value += is_in(w, text_to_count[text])
+    return nxx_value
 
-def chi_square(w, c):
-    global num_train, nxxs, nxxs_map, nxx_dict
-    ns_dict = {}
-    for n in nxxs:
-        if w not in nxx_dict[n]:
-            nxx_dict[n][w] = {}
-        if c not in nxx_dict[n][w]:
-            nxx_dict[n][w][c] = count_nxx(n, w, c)
-        ns_dict[n] = nxx_dict[n][w][c]
-    for n, nn in nxxs_map.items():
-        ns_dict[n] = num_train - nxx_dict[nn][w][c]
-    n00, n01, n10, n11 = ns_dict['n00'], ns_dict['n01'], ns_dict['n10'], ns_dict['n11']
+def calc_chi_square(w, c):
+    nxx_to_count = {}
+    for n in nxx_list:
+        if w not in nxx_to_word_to_class_to_chi[n]:
+            nxx_to_word_to_class_to_chi[n][w] = {}
+        if c not in nxx_to_word_to_class_to_chi[n][w]:
+            nxx_to_word_to_class_to_chi[n][w][c] = count_nxx(n, w, c)
+        nxx_to_count[n] = nxx_to_word_to_class_to_chi[n][w][c]
+    for n, nn in nxx_map.items():
+        nxx_to_count[n] = num_train - nxx_to_word_to_class_to_chi[nn][w][c]
+    n00, n01, n10, n11 = nxx_to_count['n00'], nxx_to_count['n01'], nxx_to_count['n10'], nxx_to_count['n11']
     return ((n11+n10+n01+n00)*(n11*n00-n10*n01)**2)/((n11+n01)*(n11+n10)*(n10+n00)*(n01+n00))
 
-def put_chi_dict(c, w, chi_square_value):
-    global chi_dict
-    if w not in chi_dict[c]:
-        chi_dict[c][w] = chi_square_value
+def put_chi(c, w, chi_value):
+    global class_to_word_to_chi
+    if w not in class_to_word_to_chi[c]:
+        class_to_word_to_chi[c][w] = chi_value
     else:
-        chi_dict[c][w] = max(chi_dict[c][w], chi_square_value)
+        class_to_word_to_chi[c][w] = max(class_to_word_to_chi[c][w], chi_value)
 
-def gen_feat():
-    global class_list, chi_dict, class_to_feat_chi_tup
-    max_feat_len = sys.maxsize
-    feat_queue_dict = { c: [] for c in class_list }
-    for c in chi_dict:
-        feat_queue_dict[c] = sorted(chi_dict[c].items(), key = lambda x: x[1], reverse = True)
-        max_feat_len = min(max_feat_len, len(feat_queue_dict[c]))
-    max_feat_len *= feat_prune_ratio 
-    class_to_feat_chi_tup = { c: feat_queue_dict[c][:int(max_feat_len)] for c in feat_queue_dict }
-
-def feat_select():
-    global class_list, class_to_text, text_to_freq, class_to_feat_chi_tup
+def gen_feat_by_tfidf():
+    global class_to_vocab_to_tfidf
+    
     for c in class_list:
         for text in class_to_text[c]:
-            for w in text_to_freq[text]:
-                put_chi_dict(c, w, chi_square(w, c))
-                gen_feat()
+            word_list = text_to_word_list[text]
+            prev_unigram = word_list[0]
+            class_to_vocab_to_tfidf[c][prev_unigram] = 0
+            for i in range(1, len(word_list)):
+                curr_unigram = word_list[i]
+                bigram = '{} {}'.format(prev_unigram, curr_unigram)
+                class_to_vocab_to_tfidf[c][curr_unigram] = 0
+                class_to_vocab_to_tfidf[c][bigram] = 0
+                prev_unigram = curr_unigram
+    for c in class_list:
+        for text in class_to_text[c]:
+            word_list = text_to_word_list[text]
+            prev_unigram = word_list[0]
+            class_to_vocab_to_tfidf[c][prev_unigram] = 0
+            for i in range(1, len(word_list)):
+                curr_unigram = word_list[i]
+                bigram = '{} {}'.format(prev_unigram, curr_unigram)
+                class_to_vocab_to_tfidf[c][curr_unigram] += 1
+                class_to_vocab_to_tfidf[c][bigram] += 1
+                prev_unigram = curr_unigram
+
+    for c in class_list:
+        num_texts = len(class_to_text[c])
+        for v in class_to_vocab_to_tfidf[c]:
+            class_to_vocab_to_tfidf[c][v] = math.log(num_texts / (1 + class_to_vocab_to_tfidf[c][v]))
+                
+    max_feat_vec_len = sys.maxsize
+    class_to_feat_sorted = { c: [] for c in class_list }
+    for c in class_to_word_to_chi:
+        class_to_feat_sorted[c] = sorted(class_to_vocab_to_tfidf[c].items(), key = lambda x: x[1], reverse = True)
+        max_feat_vec_len = min(max_feat_vec_len, len(class_to_feat_sorted[c]))
+    max_feat_vec_len *= feat_prune_ratio 
+    class_to_vocab_to_tfidf = { c: class_to_feat_sorted[c][:int(max_feat_vec_len)] for c in class_to_feat_sorted }
+
+def feat_select():
+    # gen_feat_by_tfidf()
+    for c in class_list:
+        for text in class_to_text[c]:
+            for w in text_to_count[text]:
+                put_chi(c, w, calc_chi_square(w, c))
+    gen_feat_by_chi()
 
 with open(stopword_list_file, 'r') as s:
     stop_list = list(map(lambda ln: ln.strip(), s.readlines()))
@@ -109,53 +179,43 @@ with open(train_class_list_file, 'r') as t:
         text = file.split('/')[-1]
         num_both += 1
         num_train += 1
-        flat_text, freq_dict = [], {}
+        flat_text = []
         with open(file, 'r') as f:
-            processed_lines = map(lambda ln: strip_and_filter_line(ln), f.readlines())
-            for line in processed_lines:
+            for line in map(lambda ln: strip_and_filter_line(ln), f.readlines()):
                 flat_text.extend(list(map(lambda word: p.stem(word, 0, len(word) - 1), line)))
-            num_words = len(flat_text)
-            last_index = num_words - 1
-            for i in range(num_words):
-                word = flat_text[i]
-                if word not in freq_dict:
-                    freq_dict[word] = 1
-                else:
-                    freq_dict[word] += 1
-                if i < last_index:
-                    bigram = '{} {}'.format(word, flat_text[i + 1])
-                    if bigram not in freq_dict:
-                        freq_dict[bigram] = 1
-                    else:
-                        freq_dict[bigram] += 1
-            # TODO: Abstract to a function
-            fin_freq_dict = { word: freq for word, freq in freq_dict.items() if freq >= k }
-            compromise = 1
-            while not fin_freq_dict and compromise <= max_compromise:
-                fin_freq_dict = { word: freq for word, freq in freq_dict.items() if freq >= k - compromise }
-                compromise += 1
-            len_gram = 2
-            while not fin_freq_dict and len_gram:
-                fin_freq_dict = { word: freq for word, freq in freq_dict.items() if len(word.split(' ')) >= len_gram }
-                len_gram -= 1
-            # END
-            sum_freq = sum(fin_freq_dict.values())
+            word_to_count = get_word_to_count(flat_text)
+            fin_word_to_count = { word: count for word, count in word_to_count.items() if count >= k }
+            if not fin_word_to_count:
+                fin_word_to_count = get_weaker_word_to_count(word_to_count)
+            sum_count = sum(fin_word_to_count.values())
+
             if curr_class not in class_list:
                 class_list.append(curr_class)
-            if curr_class not in class_to_text:
-                class_to_text[curr_class] = set()
-            else:
-                class_to_text[curr_class].add(text)
-            if text not in text_to_freq:
-                text_to_freq[text] = {}
-            else:
-                text_to_freq[text] = { word: freq / sum_freq for word, freq in fin_freq_dict.items() }
+                num_class += 1
+                class_to_text[c] = set()
+                class_to_word_to_chi[c] = {}
+                class_to_feat_chi_tup[c] = set()
+                class_to_vocab_to_tfidf[c] = {}
+                # class_to_word_to_num_text[c] = {}
+                class_to_feat_tfidf_tup[c] = set()
+                class_to_feat_set[c] = set()
+                class_to_feat_list_sort_by_lex[c] = []
+                class_to_feat_to_index[c] = {}
+                class_to_weights[c] = []
 
-chi_dict = { c: {} for c in class_list }
+            class_to_text[curr_class].add(text)
+            text_to_word_list[text] = flat_text
+            text_to_count[text] = { word: count / sum_count for word, count in fin_word_to_count.items() }
+
+class_to_word_to_chi = { c: {} for c in class_list }
 class_to_feat_chi_tup = { c: set() for c in class_list }
+class_to_word_to_num_text = { c: {} for c in class_list }
+class_to_feat_tfidf_tup = { c: set() for c in class_list }
+
 feat_select()
 
 class_to_feat_set = { c: set() for c in class_list }
+
 for c in class_to_feat_chi_tup:
     for p in class_to_feat_chi_tup[c]:
         w = p[0]
@@ -177,6 +237,8 @@ for c in class_to_feat_list_sort_by_lex:
     for i in range(len(class_to_feat_list_sort_by_lex[c])):
         class_to_feat_to_index[c][class_to_feat_list_sort_by_lex[c][i]] = i
 
+# https://machinelearningmastery.com/implement-perceptron-algorithm-scratch-python/
+# Split data_mat into num_folds number of folds
 def get_folds(data_mat, num_folds):
     folds = []
     data_clone = list(data_mat)
@@ -189,6 +251,7 @@ def get_folds(data_mat, num_folds):
         folds.append(fold)
     return folds
 
+# Calculate accuracy percentage
 def get_accuracy(predicted, actual):
     num_correct = 0
     for i in range(len(actual)):
@@ -196,6 +259,7 @@ def get_accuracy(predicted, actual):
             num_correct += 1
     return num_correct / len(actual) * 100
 
+# Evaluate an algorithm using a cross validation split
 def get_cross_validation_scores(data_mat, algorithm, num_folds, *args):
     folds = get_folds(data_mat, num_folds)
     scores = []
@@ -214,12 +278,14 @@ def get_cross_validation_scores(data_mat, algorithm, num_folds, *args):
         scores.append(accuracy)
     return scores
 
+# Make a prediction with weights
 def predict(row, weights):
     activation = weights[0]
     for i in range(len(row) - 1):
         activation += weights[i + 1] * row[i]
     return 1 if activation >= 0 else 0
 
+# Estimate Perceptron weights using stochastic gradient descent
 def train_weights(train, alpha, max_iterations = 1000):
     weights = [0 for i in range(len(train[0]))]
     for _ in range(max_iterations):
@@ -231,15 +297,17 @@ def train_weights(train, alpha, max_iterations = 1000):
                 weights[i + 1] += alpha * error * row[i]
     return weights
 
+# Perceptron Algorithm With Stochastic Gradient Descent
 def perceptron(train, test, alpha, max_iterations):
     predictions = list()
     weights = train_weights(train, alpha, max_iterations)
-    print(weights) # TODO: Record the weights somewhere
+    print(weights)
     for row in test:
         prediction = predict(row, weights)
         predictions.append(prediction)
     return predictions
 
+# load and prepare data
 class_to_feat_mat = { c: [] for c in class_list }
 for c in class_list:
     for d in class_list:
@@ -247,16 +315,16 @@ for c in class_list:
         num_texts = len(texts)
         texts = iter(texts)
         if c != d:
-            num_texts_to_train = int((1 - train_ratio) * num_texts)
+            num_texts_to_train = int(num_texts * train_ratio / (num_class - 1))
         else:
             num_texts_to_train = num_texts
         for i in range(num_texts_to_train):
             text = next(texts)
             feat_vec = [0 for i in range(len(class_to_feat_to_index[d]) + 1)]
-            for word in text_to_freq[text]:
+            for word in text_to_count[text]:
                 if word in class_to_feat_to_index[d]:
                     index = class_to_feat_to_index[d][word]
-                    feat_vec[index] = text_to_freq[text][word]
+                    feat_vec[index] = text_to_count[text][word]
             feat_vec[-1] = 1 if c == d else 0
             class_to_feat_mat[c].append(feat_vec)
 
@@ -272,6 +340,16 @@ for num_folds in num_folds_list:
                 print('Cross validation scores: {}'.format(scores))
                 print('Mean accuracy: {:.2f}%'.format(sum(scores) / num_folds))
                 print()
+
+for c in class_list:
+    class_to_weights[c] = train_weights(data, alpha_list[0], max_iterations_list[0])
+
+with open(model_file, 'w') as m:
+    lines_to_write = []
+    lines_to_write.append(str(class_list))
+    lines_to_write.append(str(class_to_feat_to_index))
+    lines_to_write.append(str(class_to_weights))
+    m.write('\n'.join(lines_to_write))
 
 # Write model to file
 # 1. Class list
