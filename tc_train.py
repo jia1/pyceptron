@@ -336,7 +336,7 @@ def perceptron(train, test, alpha, max_iterations):
 
 print('Perceptron helper functions defined.')
 
-# load and prepare data
+# Load and prepare data
 class_to_feat_mat = { c: [] for c in class_list }
 for c in class_list:
     for d in class_list:
