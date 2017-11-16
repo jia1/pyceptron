@@ -15,15 +15,15 @@ print('Command line arguments accepted.')
 stopword_list_file, train_class_list_file, model_file = args[1:]
 
 k = 3
-max_compromise = 1
+max_compromise = 0
 num_both, num_train = 0, 0
 train_ratio = 1
 # train_ratio = 0.8
 # test_ratio = 1 - train_ratio
 
 num_folds_list = [10] # [5, 10]
-alpha_list = [0.05] # [0.02, 0.03, 0.05, 0.07, 0.1]
-max_iterations_list = [1000] # [500, 1000, 2000]
+alpha_list = [0.1] # [0.05, 0.1]
+max_iterations_list = [500] # [500, 1000]
 
 num_class = 0
 class_list = []

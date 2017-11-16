@@ -14,7 +14,6 @@ max_compromise = 0
 lines_to_write = []
 
 stopword_list_file, model_file, test_list_file, test_class_list_file = args[1:]
-# stopword_list_file, model_file, test_list_file, test_class_list_file = 'stopword-list', 'model', 'test-list-local', 'test-class-list-local'
 p = PorterStemmer()
 
 def strip_and_filter_line(ln):
@@ -75,16 +74,6 @@ with open(stopword_list_file, 'r') as s:
 with open(model_file, 'r') as m:
     lines = list(map(lambda w: ast.literal_eval(w), m.readlines()))
     class_list, class_to_feat_to_index, class_to_weights = lines
-
-'''
-with open(test_class_list_file, 'r') as a:
-    lines = map(lambda ln: ln.strip().split(' '), a.readlines())
-    for ln in lines:
-        file, curr_class = ln
-        # text = file.split('/')[-1]
-        text = re.split('[(\\\\)(\\)(\/)]', file)[-1]
-        text_to_class[text] = curr_class
-'''
 
 with open(test_list_file, 'r') as t:
     # lines = map(lambda ln: ln.strip(), t.readlines())
