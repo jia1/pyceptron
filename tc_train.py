@@ -361,6 +361,7 @@ print('Training data converted to vectors.')
 
 data = class_to_feat_mat
 
+'''
 print('Cross validation beginning...')
 
 for num_folds in num_folds_list:
@@ -377,6 +378,9 @@ for num_folds in num_folds_list:
 
 print('Cross validation completed.')
 print('Full training beginning...')
+'''
+
+print('Training beginning...')
 
 for c in class_list:
     class_to_weights[c] = train_weights(data[c], alpha_list[0], max_iterations_list[0])
