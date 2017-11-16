@@ -320,9 +320,10 @@ def train_weights(train, alpha, max_iterations = 1000):
         for row in train:
             prediction = predict(row, weights)
             error = row[-1] - prediction
-            weights[0] = weights[0] + alpha * error
-            for i in range(len(row) - 1):
-                weights[i + 1] += alpha * error * row[i]
+            if error:
+                weights[0] = weights[0] + alpha * error
+                for i in range(len(row) - 1):
+                    weights[i + 1] += alpha * error * row[i]
     return weights
 
 # Perceptron Algorithm With Stochastic Gradient Descent
