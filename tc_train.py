@@ -29,7 +29,7 @@ num_class = 0
 class_list = []
 class_to_text = {}
 
-feat_prune_ratio = 0.5
+feat_prune_ratio = 0.7
 
 text_to_count = {}
 nxx_list = ['n10', 'n11']
@@ -80,7 +80,7 @@ def get_word_to_count(word_list):
 
 def get_weaker_word_to_count(word_to_count):
     fin_word_to_count = {}
-    for compromise in range(1, max_compromise - 1):
+    for compromise in range(1, max_compromise + 1):
         if fin_word_to_count:
             break
         fin_word_to_count = { word: count for word, count in word_to_count.items() \

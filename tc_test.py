@@ -9,13 +9,12 @@ args = sys.argv
 if len(args) != 5:
     sys.exit('Usage: python3 tc_test.py stopword-list model test-list test-class-list')
 
-k = 3
-max_compromise = 1
-text_to_class = {}
+k = 1
+max_compromise = 0
 lines_to_write = []
-score, total = 0, 0
 
 stopword_list_file, model_file, test_list_file, test_class_list_file = args[1:]
+# stopword_list_file, model_file, test_list_file, test_class_list_file = 'stopword-list', 'model', 'test-list-local', 'test-class-list-local'
 p = PorterStemmer()
 
 def strip_and_filter_line(ln):
@@ -41,7 +40,7 @@ def get_word_to_count(word_list):
 
 def get_weaker_word_to_count(word_to_count):
     fin_word_to_count = {}
-    for compromise in range(1, max_compromise - 1):
+    for compromise in range(1, max_compromise + 1):
         if fin_word_to_count:
             break
         fin_word_to_count = { word: count for word, count in word_to_count.items() \
@@ -53,6 +52,23 @@ def get_weaker_word_to_count(word_to_count):
                 break
     return fin_word_to_count
 
+def get_activation(row, weights):
+    activation = weights[0]
+    for i in range(len(row) - 1):
+        activation += weights[i + 1] * row[i]
+    return activation
+
+def predict(activation):
+    return 1 if activation >= 0 else 0
+
+'''
+def predict(row, weights):
+    activation = weights[0]
+    for i in range(len(row) - 1):
+        activation += weights[i + 1] * row[i]
+    return 1 if activation >= 0 else 0
+'''
+
 with open(stopword_list_file, 'r') as s:
     stop_list = list(map(lambda ln: ln.strip(), s.readlines()))
 
@@ -60,6 +76,7 @@ with open(model_file, 'r') as m:
     lines = list(map(lambda w: ast.literal_eval(w), m.readlines()))
     class_list, class_to_feat_to_index, class_to_weights = lines
 
+'''
 with open(test_class_list_file, 'r') as a:
     lines = map(lambda ln: ln.strip().split(' '), a.readlines())
     for ln in lines:
@@ -67,6 +84,7 @@ with open(test_class_list_file, 'r') as a:
         # text = file.split('/')[-1]
         text = re.split('[(\\\\)(\\)(\/)]', file)[-1]
         text_to_class[text] = curr_class
+'''
 
 with open(test_list_file, 'r') as t:
     # lines = map(lambda ln: ln.strip(), t.readlines())
@@ -87,18 +105,16 @@ with open(test_list_file, 'r') as t:
             normalized_word_to_count = { word: count / sum_count for word, count in fin_word_to_count.items() }
             instance_class_to_output = { c: 0 for c in class_list }
             for c in class_list:
+                feat_vec = [0 for i in range(len(class_to_feat_to_index[c]))]
                 for w in class_to_feat_to_index[c]:
                     if w in normalized_word_to_count:
                         index = class_to_feat_to_index[c][w]
-                        instance_class_to_output[c] += class_to_weights[c][index] * normalized_word_to_count[w]
+                        feat_vec[index] = normalized_word_to_count[w]
+                instance_class_to_output[c] = get_activation(feat_vec, class_to_weights[c])
             instance_class_to_output = sorted(instance_class_to_output.items(), key = lambda x: x[1], reverse = True)
-            lines_to_write.append('{} {}\n'.format(file, instance_class_to_output))
-            total += 1
-            if text_to_class[text] == instance_class_to_output[0][0]:
-                score += 1
-
-print(score)
-print(total)
+            instance_class_to_output = list(filter(lambda x: x[1] != 0, instance_class_to_output))
+            predicted_class = instance_class_to_output[0][0]
+            lines_to_write.append('{} {}\n'.format(file, predicted_class))
 
 with open('answer', 'w') as f:
     f.writelines(lines_to_write)
