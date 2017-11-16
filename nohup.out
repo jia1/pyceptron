@@ -1,0 +1,18 @@
+Command line arguments accepted.
+Data structures loaded.
+Helper functions defined.
+Stop words loaded into memory.
+Frequency of unigrams and bigrams counted.
+Feature selection beginning...
+Feature selection completed.
+Features from negative classes added to each positive class.
+Features mapped to vector indices.
+Perceptron helper functions defined.
+Training data converted to vectors.
+Training beginning...
+Weights being written to model file...
+Done.
+
+real    15:39.1
+user    15:31.2
+sys         0.3
