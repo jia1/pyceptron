@@ -100,10 +100,11 @@ with open(test_list_file, 'r') as t:
                         index = class_to_feat_to_index[c][w]
                         feat_vec[index] = normalized_word_to_count[w]
                 instance_class_to_output[c] = get_activation(feat_vec, class_to_weights[c])
+                # instance_class_to_output[c] = predict(get_activation(feat_vec, class_to_weights[c]))
             instance_class_to_output = sorted(instance_class_to_output.items(), key = lambda x: x[1], reverse = True)
             instance_class_to_output = list(filter(lambda x: x[1] != 0, instance_class_to_output))
             predicted_class = instance_class_to_output[0][0]
             lines_to_write.append('{} {}\n'.format(file, predicted_class))
 
-with open('answer', 'w') as f:
+with open(test_class_list_file, 'w') as f:
     f.writelines(lines_to_write)
