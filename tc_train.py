@@ -22,7 +22,7 @@ train_ratio = 1
 # test_ratio = 1 - train_ratio
 
 num_folds_list = [10] # [5, 10]
-alpha_list = [0.1] # [0.05, 0.1]
+alpha_list = [0.05] # [0.05, 0.1]
 max_iterations_list = [500] # [500, 1000]
 
 num_class = 0
@@ -362,7 +362,6 @@ print('Training data converted to vectors.')
 
 data = class_to_feat_mat
 
-'''
 print('Cross validation beginning...')
 
 for num_folds in num_folds_list:
@@ -379,7 +378,6 @@ for num_folds in num_folds_list:
 
 print('Cross validation completed.')
 print('Full training beginning...')
-'''
 
 print('Training beginning...')
 
